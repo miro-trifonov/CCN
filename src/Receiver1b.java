@@ -18,7 +18,7 @@ public class Receiver1b {
             //buffer to receive incoming data
             byte[] buffer = new byte[1027];
             DatagramPacket incoming = new DatagramPacket(buffer, buffer.length);
-            ByteOutputStream image = new ByteOutputStream();
+//            ByteOutputStream image = new ByteOutputStream();
             byte[] lastReceived = new byte[2];
 
             while (true) {
@@ -35,18 +35,21 @@ public class Receiver1b {
                     lastReceived[1] = reply[1];
                 }
 
-                for (int i = 0; i < length; i++) {
-                    image.write(buffer[i]);
-                }
+//                for (int i = 0; i < length - 3 ; i++) {
+//                    image.write(buffer[i]);
+//                }
                 DatagramPacket dp = new DatagramPacket(reply, reply.length, incoming.getAddress(), incoming.getPort());
                 sock.send(dp);
                 FileOutputStream output = new FileOutputStream("newImage", true);
+                System.out.println(buffer[length -1]);
+
                 try {
-                    output.write(buffer);
+                    output.write(buffer,0, length -3);
                 } finally {
                     output.close();
                 }
-                if (buffer[length + 2] == 0){
+                System.out.println(buffer[length -1]);
+                if (buffer[length -1] == 0){
                     break;
                 }
 

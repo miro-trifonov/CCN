@@ -16,40 +16,42 @@ public class Sender1b {
         try {
             sock = new DatagramSocket(2001);
 
-            byte[] buffer = new byte[1027];
+            byte[] buffer = new byte[1024];
             File file = new File("test.jpg");
             FileInputStream fis = new FileInputStream(file);
-            int counter = 0;
+            short counter = 0;
             boolean retransmit = false;
+            byte[] sendBuffer = new byte[1027];
             // 1024 bytes
             while (true) {
                 if (!retransmit) {
                     buffer = new byte[1024];
                     int bytesRead = fis.read(buffer);
+                    sendBuffer = new byte[bytesRead + 3];
                     counter++;
-                    byte[] counterByte = ByteBuffer.allocate(2).putInt(counter).array();
-                    boolean end = bytesRead > 1024;
+                    byte[] counterByte = ByteBuffer.allocate(2).putShort(counter).array();
+                    boolean end = bytesRead < 1024;
                     if (bytesRead <= 0) {
                         break;
                     } else {
-                        byte[] sendbuffer = new byte[bytesRead];
                         for (int i = 0; i <= bytesRead; i++) {
-                            String helpMe = "I'm trapped in a program";
-                            sendbuffer[i] = buffer[i];
                             if (i == bytesRead) {
-                                sendbuffer[i] = counterByte[1];
-                                sendbuffer[i + 1] = counterByte[2];
+                                String helpMe = "I'm trapped in a program";
+                                sendBuffer[i] = counterByte[0];
+                                sendBuffer[i + 1] = counterByte[1];
                                 if (end) {
-                                    sendbuffer[i + 2] = 0;
+                                    sendBuffer[i + 2] = 0;
 
                                 } else {
-                                    sendbuffer[i + 2] = 1;
+                                    sendBuffer[i + 2] = 1;
                                 }
+                            }else {
+                                sendBuffer[i] = buffer[i];
                             }
                         }
                     }
                 }
-                DatagramPacket packet = new DatagramPacket(buffer, buffer.length, InetAddress.getLocalHost(), port);
+                DatagramPacket packet = new DatagramPacket(sendBuffer, sendBuffer.length, InetAddress.getLocalHost(), port);
                 sock.send(packet);
 //                    System.out.println("Sent");
                 try {
@@ -58,12 +60,12 @@ public class Sender1b {
                     sock.receive(reply);
                     sock.setSoTimeout(10);
                     byte[] data = reply.getData();
-                    int packetReceived = ByteBuffer.wrap(data).getInt();
+                    int packetReceived = ByteBuffer.wrap(data).getShort();
                     if (packetReceived == counter) {
                         retransmit = false;
-                        System.out.println("retransmitted");
                     }
                 } catch (SocketTimeoutException x) {
+                    System.out.println("timeout");
                     retransmit = true;
                 }
             }

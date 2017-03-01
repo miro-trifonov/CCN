@@ -17,29 +17,31 @@ public class Sender1a {
             byte[] buffer = new byte[1024];
             File file = new File("test.jpg");
             FileInputStream fis = new FileInputStream(file);
-            int counter = 0;
+            short counter = 0;
             // 1024 bytes
             while (true) {
                 counter++;
                 int bytesRead = fis.read(buffer);
-                byte[] counterByte = ByteBuffer.allocate(2).putInt(counter).array();
-                boolean end = bytesRead > 1024;
+                byte[] counterByte = ByteBuffer.allocate(2).putShort(counter).array();
+                boolean end = bytesRead < 1024;
                 if (bytesRead > 0) {
-                    byte[] sendbuffer = new byte[bytesRead];
-                    for (int i = 0; i <= bytesRead; i++) {
-                        sendbuffer[i] = buffer[i];
-                        if (i == bytesRead) ;
-                        sendbuffer[i] = counterByte[1];
-                        sendbuffer[i + 1] = counterByte[2];
-                        if (end){
-                            sendbuffer[i + 2] = 0;
+                    byte[] sendBuffer = new byte[bytesRead + 3];
+                    for (int i = 0; i < bytesRead; i++) {
+                        if (i + 1 == bytesRead) {
+                            sendBuffer[i + 1] = counterByte[0];
+                            sendBuffer[i + 2] = counterByte[1];
+                            if (end) {
+                                sendBuffer[i + 3] = 0;
 
-                        }else {
-                            sendbuffer[i + 2] = 1;
+                            } else {
+                                sendBuffer[i + 3] = 1;
+                            }
                         }
+                        sendBuffer[i] = buffer[i];
 
                     }
-                    DatagramPacket packet = new DatagramPacket(buffer, buffer.length, InetAddress.getLocalHost(), port);
+                    System.out.println(sendBuffer.length);
+                    DatagramPacket packet = new DatagramPacket(sendBuffer, sendBuffer.length, InetAddress.getLocalHost(), port);
                     sock.send(packet);
                     buffer = new byte[1024];
 //                    System.out.println("Sent");
