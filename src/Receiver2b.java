@@ -9,7 +9,8 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 
-public class Receiver2a {
+public class Receiver2b {
+    //TODO buffer packages; support out of order storage and then writing;
 
     public static void main(String args[]) {
         int port = 2000;

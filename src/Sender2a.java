@@ -9,17 +9,40 @@ import java.nio.ByteBuffer;
 import java.util.*;
 
 public class Sender2a {
+
+    private  final Runnable sender;
+    private  final Runnable goBackN;
+
+    private int port = 2000;
+    private int windowsize = 5;
+    private int retryTimeout = 100;
+    private DatagramSocket sock = null;
+    private TreeMap<Integer, byte[]> packetsInTransit = new TreeMap<>();
+    private TreeMap<Integer, Long> timeMap = new TreeMap<Integer, Long>();
+
+    private Sender2a() {
+        sender = new Runnable() {
+            public void run() {
+                senderThread();
+            }
+        };
+        goBackN = new Runnable() {
+            public void run() {
+                goBackNThread();
+            }
+        };
+    }
+
     public static void main(String args[]) {
-        int port = 2000;
-        int windowsize = 5;
-        int retryTimeout = 100;
-        DatagramSocket sock = null;
 
+        Sender2a mainProgram = new Sender2a();
+        new Thread(mainProgram.sender).start(); // start A
+        new Thread(mainProgram.goBackN).start(); // start B
+    }
 
+    private  void senderThread() {
         try {
 
-            TreeMap<Integer, byte[]> packetsInTransit = new TreeMap<>();
-            TreeMap<Integer, time> timeMap = new TreeMap<Integer, time>();
             sock = new DatagramSocket(2001);
             byte[] buffer;
             File file = new File("test.jpg");
@@ -54,11 +77,10 @@ public class Sender2a {
                             }
                         }
                     }
-                    time = sendPackage(sendBuffer, port, sock);
+                    long time = sendPackage(sendBuffer, port, sock) + retryTimeout;
                     packetsInTransit.put((int) packetNumber, sendBuffer);
                     timeMap.put((int) packetNumber, time);
                     packetNumber++;
-
                 }
                 // This part for catching the replies
                 try {
@@ -77,18 +99,6 @@ public class Sender2a {
 
             }
             // That would be be the second thread
-            while (true) {
-                if (currentTime > timeMap.get(timeMap.firstKey())) {
-                    //maybe TODO pause other thread
-                    for (int key = timeMap.firstKey(); key <= timeMap.lastKey(); key++) {
-                        newTime = sendPackage(packetsInTransit.get(key), port, sock);
-                        timeMap.put(key, newTime);
-                    }
-                    // The key with min time is always going to be the one which is send at the latest point
-                    minTimeKeyOffset++;
-                }
-
-            }
         } catch (IOException e) {
             System.err.println("IOException" + e);
 //        } catch (InterruptedException e) {
@@ -101,12 +111,26 @@ public class Sender2a {
         }
     }
 
-    private static void sendPackage(byte[] byteArray, int port, DatagramSocket sock) {
+    private  void goBackNThread() {
+        while (true) {
+            if (System.currentTimeMillis() > timeMap.get(timeMap.firstKey())) {
+                //maybe TODO pause other thread
+                for (int key = timeMap.firstKey(); key <= timeMap.lastKey(); key++) {
+                    long newTime = sendPackage(packetsInTransit.get(key), port, sock) + retryTimeout;
+                    timeMap.put(key, newTime);
+                }
+            }
+
+        }
+    }
+
+    private static long sendPackage(byte[] byteArray, int port, DatagramSocket sock) {
         try {
             DatagramPacket packet = new DatagramPacket(byteArray, byteArray.length, InetAddress.getLocalHost(), port);
             sock.send(packet);
         } catch (IOException e) {
             System.err.println("IOException" + e);
         }
+        return System.currentTimeMillis();
     }
 }

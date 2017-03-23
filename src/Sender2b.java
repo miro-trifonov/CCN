@@ -8,25 +8,49 @@ import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
 import java.util.*;
 
-public class Sender2a {
+public class Sender2b {
+
+    private  final Runnable sender;
+    private  final Runnable selectiveRepeat;
+
+    private int port = 2000;
+    private int windowsize = 5;
+    private int retryTimeout = 100;
+    private DatagramSocket sock = null;
+    private TreeMap<Integer, byte[]> packetsInTransit = new TreeMap<>();
+    private TreeMap<Integer, Long> timeMap = new TreeMap<Integer, Long>();
+
+    private Sender2b() {
+        sender = new Runnable() {
+            public void run() {
+                senderThread();
+            }
+        };
+        selectiveRepeat = new Runnable() {
+            public void run() {
+                selectiveRepeat();
+            }
+        };
+    }
+
     public static void main(String args[]) {
-        int port = 2000;
-        int windowsize = 5;
-        int retryTimeout = 100;
-        DatagramSocket sock = null;
 
+        Sender2b mainProgram = new Sender2b();
+        new Thread(mainProgram.sender).start(); // start A
+        new Thread(mainProgram.selectiveRepeat).start(); // start B
+    }
 
+    private  void senderThread() {
         try {
-            int windowMaxPackageNumber = windowsize;
-            SortedMap<Integer, byte[]> packetsInTransit = new HashMap<>();
-            SortedMap<Integer, time> timeMap = new SortedMap<Integer, time>();
+
             sock = new DatagramSocket(2001);
             byte[] buffer;
             File file = new File("test.jpg");
             FileInputStream fis = new FileInputStream(file);
             short packetNumber = 0; // or 1 ?
-            boolean retransmit = false;
             byte[] sendBuffer = new byte[1027];
+            int windowMaxPackageNumber = windowsize;
+
             // 1024 bytes
             while (true) {
                 if (packetNumber == windowMaxPackageNumber) {
@@ -55,13 +79,12 @@ public class Sender2a {
                             }
                         }
                     }
-                    time = sendPackage(sendBuffer, port, sock);
+                    long time = sendPackage(sendBuffer, port, sock) + retryTimeout;
                     packetsInTransit.put((int) packetNumber, sendBuffer);
                     timeMap.put((int) packetNumber, time);
                     packetNumber++;
-
                 }
-                // This part for cathing the replies
+                // This part for catching the replies
                 try {
                     byte[] replyBuffer = new byte[2];
                     DatagramPacket reply = new DatagramPacket(replyBuffer, replyBuffer.length);
@@ -71,25 +94,15 @@ public class Sender2a {
                     if (packetsInTransit.lastKey().equals(packetsInTransit.firstKey())){
                         windowMaxPackageNumber =packetsInTransit.firstKey() + windowsize + 1;
                     }
-                        packetsInTransit.remove(packetReceived);
-                        timeMap.remove(packetReceived);
+                    packetsInTransit.remove(packetReceived);
+                    timeMap.remove(packetReceived);
                     windowMaxPackageNumber =packetsInTransit.firstKey() + windowsize;
-
                 } catch (IOException e) {
                     System.err.println("IOException" + e);
                 }
 
             }
             // That would be be the second thread
-            while (true) {
-                for (Integer key: timeMap.keySet()){
-                if (currentTime > timeMap.get(key)) {
-                        newTime = sendPackage(packetsInTransit.get(key), port, sock);
-                        timeMap.put(key, newTime);
-                }
-
-            }
-            }
         } catch (IOException e) {
             System.err.println("IOException" + e);
 //        } catch (InterruptedException e) {
@@ -102,12 +115,25 @@ public class Sender2a {
         }
     }
 
-    private static void sendPackage(byte[] byteArray, int port, DatagramSocket sock) {
+    private  void selectiveRepeat() {
+        while (true) {
+            for (Integer key: timeMap.keySet()){
+                if (System.currentTimeMillis() > timeMap.get(key)) {
+                    long newTime = sendPackage(packetsInTransit.get(key), port, sock);
+                    timeMap.put(key, newTime);
+                }
+
+            }
+        }
+    }
+
+    private static long sendPackage(byte[] byteArray, int port, DatagramSocket sock) {
         try {
             DatagramPacket packet = new DatagramPacket(byteArray, byteArray.length, InetAddress.getLocalHost(), port);
             sock.send(packet);
         } catch (IOException e) {
             System.err.println("IOException" + e);
         }
+        return System.currentTimeMillis();
     }
 }
